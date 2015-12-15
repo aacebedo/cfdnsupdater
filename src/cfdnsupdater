@@ -1,0 +1,509 @@
+#!/usr/bin/env python3
+#
+# cfdnsupdater
+# Copyright (c) 2015, Alexandre ACEBEDO, All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 3.0 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library.
+#
+"""
+This file contains the CFDNSUpdater code
+"""
+from requests import get, put
+import json
+from enum import Enum
+from time import sleep
+import threading
+import sys
+import argparse
+import argcomplete
+import logging
+from logging import StreamHandler
+from logging.handlers import SysLogHandler
+
+ROOTLOGGER = logging.getLogger("cloudflarednsupdater")
+
+class RecordType(Enum):
+    """
+    Enumeration describing supported record types
+    """
+    A = 1 # pylint: disable=invalid-name
+    AAAA = 2
+    CNAME = 3
+    MX = 4 # pylint: disable=invalid-name
+    LOC = 5
+    SRV = 6
+    SPF = 7
+    TXT = 8
+    NS = 9 # pylint: disable=invalid-name
+
+    def __str__(self):
+        return str(self.name)
+
+    def __repr__(self):
+        return str(self.name)
+
+    @staticmethod
+    def from_string(val):
+        """
+        Turns a string into a record type
+        """
+        mapping_table = {str(RecordType.A): RecordType.A,
+                         str(RecordType.AAAA): RecordType.AAAA,
+                         str(RecordType.CNAME): RecordType.CNAME,
+                         str(RecordType.MX): RecordType.MX,
+                         str(RecordType.LOC): RecordType.LOC,
+                         str(RecordType.SRV): RecordType.SRV,
+                         str(RecordType.SPF): RecordType.SPF,
+                         str(RecordType.TXT): RecordType.TXT,
+                         str(RecordType.NS): RecordType.NS
+                        }
+        if val in mapping_table.keys():
+            return mapping_table[val]
+        else:
+            raise RuntimeError(
+                "Unable to convert string {} into a ReturnType".format(val))
+
+
+class CloudFlareDNSUpdater(object):
+    """
+    Core class of the updater
+    """
+    def __init__(self, email, apikey, domain, instance):
+        self.email = email
+        self.apikey = apikey
+        self.record_types_to_update = instance["record_types"]
+        self.record_names_to_update = instance["record_names"]
+        self.record_content = instance["record_content"]
+        self.domain = domain
+
+    @staticmethod
+    def get_public_ip():
+        """
+        Get the public IP of your host
+        It makes use of the ipify service
+        """
+        res = get('https://api.ipify.org').text
+        if res is None:
+            ROOTLOGGER.error(
+                "Unable to retrieve public IP, updater cannot start")
+        return res
+
+    def update_domain(self):
+        """
+        Update a domain
+        """
+        ROOTLOGGER.debug(
+            "Getting cloudflare record for zone '{}'".format(self.domain))
+        # First search for a corresponding domain
+        response = get(
+            "https://api.cloudflare.com/client/v4/zones",
+            params={"name": self.domain},
+            headers={'x-auth-email': self.email,
+                     'x-auth-key': self.apikey})
+        response_json = json.loads(response.content.decode())
+        ROOTLOGGER.log(5, "Received JSON response: '{}'".format(response_json))
+        if response_json["result_info"]["total_count"] == 1:
+            # If domain has been found, procesing it
+            ROOTLOGGER.debug("One domain found, processing it")
+            # Retrieving zone records for zone
+            zone = response_json["result"][0]
+            zone_id = zone["id"]
+            ROOTLOGGER.debug(
+                "Getting DNS records for the domain '{}'".format(self.domain))
+            response = get(
+                "https://api.cloudflare.com/client/v4/zones/{}/dns_records"\
+                .format(
+                    zone_id),
+                headers={'x-auth-email': self.email,
+                         'x-auth-key': self.apikey})
+            response_json = json.loads(response.content.decode())
+            ROOTLOGGER.log(
+                5,
+                "Received JSON response: '{}'".format(response_json))
+            dns_records = response_json["result"]
+            for record in dns_records:
+                # Each records of the zone will is process
+                try:
+                    ROOTLOGGER.debug(
+                        "Processing record '{}'".format(record["name"]))
+                    record_type = RecordType.from_string(record["type"])
+                    record_id = record["id"]
+                    record_name = record["name"]
+                    record_content = record["content"]
+                    # Record is updated only if its type is in the
+                    # record types to be updated or its name is
+                    # in the name of type to update
+                    if (len(self.record_types_to_update) == 0 or \
+                        record_type in self.record_types_to_update) and \
+                        (len(self.record_names_to_update) == 0 or \
+                         record_name in self.record_names_to_update) and \
+                            self.record_content != record_content:
+                        ROOTLOGGER.debug(
+                            "Record {} needs to be updated"\
+                            .format(record["name"]))
+                        old_record_content = record["content"]
+                        record["content"] = self.record_content
+                        response = put(
+                            "https://api.cloudflare.com/client/v4/zones/{}/\
+dns_records/{}".format(zone_id, record_id),
+                            data=json.dumps(record),
+                            headers={'x-auth-email': self.email,
+                                     'x-auth-key': self.apikey})
+                        ROOTLOGGER.debug("Executing update")
+                        response_json = json.loads(response.content.decode())
+                        ROOTLOGGER.log(5,
+                                       "Received JSON response: '{}'"\
+                                       .format(response_json))
+                        if response_json["success"] == True:
+                            ROOTLOGGER.info("Content of DNS record ({}) '{}'\
+ of domain '{}' has been updated from {} to '{}'".format(record["type"],
+                                                         record_name,
+                                                         self.domain,
+                                                         old_record_content,
+                                                         self.record_content))
+                        else:
+                            ROOTLOGGER.warning("Unable to update content of\
+ DNS record ({}) '{}' of domain '{}' from {} \
+ to '{}' ({})".format(record["type"],
+                      record_name,
+                      self.domain,
+                      old_record_content,
+                      self.record_content,
+                      response_json["errors"][0]["error_chain"][0]["message"]))
+                    else:
+                        ROOTLOGGER.info("Record '{}' ignored"\
+                                      .format(record_name))
+                except RuntimeError as raised_except:
+                    ROOTLOGGER.warning("Record '{}' ignored ({})"\
+                        .format(record["name"], raised_except))
+        else:
+            ROOTLOGGER.warning("Domain '{}' ignored (not found')")
+
+class CloudFlareDNSUpdaterThread(threading.Thread):
+    """
+    Thread class handling periodic verification of public IP
+    and executing the domain update
+    """
+    MINIMUM_PERIOD = 30
+
+    def __init__(self, updater, period):
+        threading.Thread.__init__(self)
+        self.running = False
+        self.updater = updater
+        self.period = CloudFlareDNSUpdaterThread.MINIMUM_PERIOD
+        if period < CloudFlareDNSUpdaterThread.MINIMUM_PERIOD:
+            ROOTLOGGER.warning(
+                "Given period {} seconds is too low, defaulting on {} \
+                seconds".format(period,
+                                CloudFlareDNSUpdaterThread.MINIMUM_PERIOD))
+            self.period = CloudFlareDNSUpdaterThread.MINIMUM_PERIOD
+        else:
+            self.period = period
+        ROOTLOGGER.debug(
+            "Getting public IP every {} seconds".format(self.period))
+
+    def run(self):
+        previous_public_ip = None
+        self.running = True
+        while self.running:
+            current_public_ip = CloudFlareDNSUpdater.get_public_ip()
+            if previous_public_ip != current_public_ip:
+                self.updater.update_domain()
+                previous_public_ip = current_public_ip
+            sleep(self.period)
+        ROOTLOGGER.info("CFDNSUpdater stopped")
+
+    def stop(self):
+        """
+        Stops the thread
+        """
+        ROOTLOGGER.info("CFDNSUpdater is stopping")
+        self.running = False
+
+
+class CloudFlareDNSUpdaterMain(object):
+    """
+    Main class
+    """
+    @staticmethod
+    def process_inline_config(parsed_args):
+        """
+        Extract configuration from inline parameters
+        """
+        updaters = []
+        email = parsed_args.email
+        apikey = parsed_args.apikey
+        record_types_to_update = set()
+        record_names_to_update = set()
+        domain = parsed_args.domain
+        record_content = parsed_args.content
+        period = parsed_args.period
+        if parsed_args.recordtype is not None:
+            for recordtype in parsed_args.recordtype:
+                record_types_to_update.add(
+                    RecordType.from_string(recordtype))
+
+        if parsed_args.recordname is not None:
+            for name in parsed_args.recordname:
+                record_names_to_update.add(
+                    "{}.{}".format(name, parsed_args.domain))
+
+
+        updaters.append(CloudFlareDNSUpdaterThread(
+            CloudFlareDNSUpdater(email, apikey, domain,
+                                 {"record_types":record_types_to_update,
+                                  "record_names":record_names_to_update,
+                                  "record_content":record_content
+                                 }), period))
+        return updaters
+
+    @staticmethod
+    def process_file_config(parsed_args): # pylint: disable=too-many-branches
+        """
+        Extract configuration from a config file
+        """
+        updaters = []
+        config_file = None
+        try:
+            config_file = open(parsed_args.config, "r", encoding="utf8")
+        except FileNotFoundError:
+            ROOTLOGGER.error(
+                "Unable to load configuration file '{}'\
+ (file not found)".format(parsed_args.config))
+            return 1
+
+        config_file_json = json.loads(config_file.read())
+        if not "email" in config_file_json:
+            raise ValueError("Invalid configuration: Missing email")
+        if not "apikey" in config_file_json:
+            raise ValueError("Invalid configuration: Missing apikey")
+        if not "period" in config_file_json:
+            raise ValueError("Invalid configuration: Missing period")
+
+        if not "instances" in config_file_json or \
+           not isinstance(config_file_json["instances"], list):
+            raise ValueError("Invalid configuration: Missing instances")
+
+        email = config_file_json["email"]
+        apikey = config_file_json["apikey"]
+        period = config_file_json["period"]
+
+        for instance in config_file_json["instances"]:
+            try:
+                if not "types" in instance or \
+                   not isinstance(instance["types"], list):
+                    raise ValueError("Invalid configuration:\
+ Missing record types in instance")
+                if not "names" in instance or \
+                   not isinstance(instance["names"], list):
+                    raise ValueError("Invalid configuration:\
+ Missing record names  in instance")
+                if not "content" in instance:
+                    raise ValueError("Invalid configuration:\
+ Missing record_content in instance")
+                if not "domain" in instance:
+                    raise ValueError("Invalid configuration:\
+ Missing domain")
+                domain = instance["domain"]
+                record_types_to_update = set()
+                record_names_to_update = set()
+                for recordtype in instance["types"]:
+                    record_types_to_update.add(
+                        RecordType.from_string(recordtype))
+                for name in instance["names"]:
+                    record_names_to_update.add(
+                        "{}.{}".format(name, domain))
+                updaters.append(
+                    CloudFlareDNSUpdaterThread(
+                        CloudFlareDNSUpdater(
+                            email,
+                            apikey,
+                            domain,
+                            {"record_types":record_types_to_update,
+                             "record_names":record_names_to_update,
+                             "record_content":instance["content"]
+                            }
+                            ),
+                        period))
+            except ValueError as raised_except:
+                ROOTLOGGER.warning(raised_except)
+        return updaters
+
+    @staticmethod
+    def init_loggers(parsed_args):
+        """
+        Initialize loggers of the program
+        """
+        formatter = logging.Formatter('%(message)s')
+        hdlr = None
+        if parsed_args.syslog:
+            hdlr = SysLogHandler(address='/dev/log',
+                                 facility=SysLogHandler.LOG_DAEMON)
+        else:
+            hdlr = StreamHandler(sys.stdout)
+
+        hdlr.setLevel(1)
+        hdlr.setFormatter(formatter)
+        ROOTLOGGER.addHandler(hdlr)
+
+    @staticmethod
+    def main(raw_args):
+        """
+        Main function
+        """
+
+        parsed_args = CloudFlareDNSUpdaterMain.parse_args(raw_args)
+        CloudFlareDNSUpdaterMain.init_loggers(parsed_args)
+
+        if parsed_args.verbose:
+            ROOTLOGGER.setLevel(logging.DEBUG)
+        elif parsed_args.veryverbose:
+            ROOTLOGGER.setLevel(4)
+        elif parsed_args.quiet:
+            ROOTLOGGER.setLevel(0)
+        else:
+            ROOTLOGGER.setLevel(logging.INFO)
+
+        updaters = []
+        if not hasattr(parsed_args, "config"):
+            updaters = CloudFlareDNSUpdaterMain.\
+                       process_inline_config(parsed_args)
+        else:
+            updaters = CloudFlareDNSUpdaterMain.process_file_config(parsed_args)
+
+        try:
+            for updater in updaters:
+                updater.start()
+            for updater in updaters:
+                updater.join()
+        except KeyboardInterrupt:
+            for updater in updaters:
+                updater.stop()
+            for updater in updaters:
+                updater.join()
+        except SystemExit:
+            pass
+        return 0
+
+    @staticmethod
+    def add_common_args(parser):
+        """
+        Add common arguments to the command line
+        """
+        verbosity_group = parser.add_mutually_exclusive_group()
+
+        verbosity_group.add_argument(
+            '--verbose',
+            '-v',
+            help='Verbose mode',
+            action='store_true',
+            default=False)
+        verbosity_group.add_argument(
+            '--veryverbose',
+            '-vv',
+            help='Very verbose mode',
+            action='store_true',
+            default=False)
+        verbosity_group.add_argument(
+            '--quiet',
+            '-q',
+            help='Quiet mode',
+            action='store_true',
+            default=False)
+
+        parser.add_argument('--syslog',
+                            '-s',
+                            help='Logging is done with syslog,\
+ console otherwise',
+                            action='store_true',
+                            default=False)
+
+    @staticmethod
+    def parse_args(raw_args):
+        """
+        Function to parse the command line arguments
+        """
+        # Create main parser
+                        # Create main parser
+        parser = argparse.ArgumentParser(
+            prog="CloudFlareDNSUpdater",
+            description='Automtatic DNS updater for cloudflare.')
+        subparsers = parser.add_subparsers()
+        inline_config_parser = subparsers.add_parser(
+            "inlineconfig",
+            help="process configuration as inline parameters")
+
+        inline_config_parser.add_argument(
+            '-e',
+            '--email',
+            required=True,
+            help='email used to log to cloudflare',
+            type=str)
+        inline_config_parser.add_argument(
+            '-a',
+            '--apikey',
+            required=True,
+            help='Api key used for authentication',
+            type=str)
+        inline_config_parser.add_argument(
+            '-p',
+            '--period',
+            default=CloudFlareDNSUpdaterThread.MINIMUM_PERIOD,
+            help='Public IP Refresh period (must be >= 30)',
+            type=int)
+
+        inline_config_parser.add_argument(
+            'domain',
+            help='Domain to update',
+            type=str)
+        inline_config_parser.add_argument(
+            'content',
+            help='New content of records',
+            type=str)
+        inline_config_parser.add_argument(
+            '--recordtype',
+            '-t',
+            help='Types of records to update',
+            action='append',
+            type=str,
+            choices=[str(s) for s in RecordType]
+        )
+        inline_config_parser.add_argument(
+            '--recordname',
+            '-n',
+            help='Names of records to update',
+            action='append',
+            type=str)
+
+        CloudFlareDNSUpdaterMain.add_common_args(inline_config_parser)
+
+        file_config_parser = subparsers.add_parser(
+            "fileconfig",
+            help="process configuration in a file")
+        file_config_parser.add_argument(
+            '--config',
+            '-c',
+            required=True,
+            help='Config file',
+            type=str)
+
+        CloudFlareDNSUpdaterMain.add_common_args(file_config_parser)
+
+        # Parse the command
+        argcomplete.autocomplete(parser)
+        return parser.parse_args(raw_args)
+
+
+if __name__ == "__main__":
+    sys.exit(CloudFlareDNSUpdaterMain.main(sys.argv[1:]))
