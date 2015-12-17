@@ -5,7 +5,6 @@
  "instances" : [
   { 
    "domain":"foo.com",
-   "content":"0.0.0.0",
    "types":["A"],
    "names":["bar"]
   }

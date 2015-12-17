@@ -84,7 +84,6 @@ class CloudFlareDNSUpdater(object):
         self.apikey = apikey
         self.record_types_to_update = instance["record_types"]
         self.record_names_to_update = instance["record_names"]
-        self.record_content = instance["record_content"]
         self.domain = domain
 
     @staticmethod
@@ -99,7 +98,7 @@ class CloudFlareDNSUpdater(object):
                 "Unable to retrieve public IP, updater cannot start")
         return res
 
-    def update_domain(self):
+    def update_domain(self, new_record_content):
         """
         Update a domain
         """
@@ -148,12 +147,12 @@ class CloudFlareDNSUpdater(object):
                         record_type in self.record_types_to_update) and \
                         (len(self.record_names_to_update) == 0 or \
                          record_name in self.record_names_to_update) and \
-                            self.record_content != record_content:
+                            new_record_content != record_content:
                         ROOTLOGGER.debug(
                             "Record {} needs to be updated"\
                             .format(record["name"]))
                         old_record_content = record["content"]
-                        record["content"] = self.record_content
+                        record["content"] = new_record_content
                         response = put(
                             "https://api.cloudflare.com/client/v4/zones/{}/\
 dns_records/{}".format(zone_id, record_id),
@@ -171,7 +170,7 @@ dns_records/{}".format(zone_id, record_id),
                                                          record_name,
                                                          self.domain,
                                                          old_record_content,
-                                                         self.record_content))
+                                                         new_record_content))
                         else:
                             ROOTLOGGER.warning("Unable to update content of\
  DNS record ({}) '{}' of domain '{}' from {} \
@@ -179,7 +178,7 @@ dns_records/{}".format(zone_id, record_id),
                       record_name,
                       self.domain,
                       old_record_content,
-                      self.record_content,
+                      new_record_content,
                       response_json["errors"][0]["error_chain"][0]["message"]))
                     else:
                         ROOTLOGGER.info("Record '{}' ignored"\
@@ -219,7 +218,7 @@ class CloudFlareDNSUpdaterThread(threading.Thread):
         while self.running:
             current_public_ip = CloudFlareDNSUpdater.get_public_ip()
             if previous_public_ip != current_public_ip:
-                self.updater.update_domain()
+                self.updater.update_domain(current_public_ip)
                 previous_public_ip = current_public_ip
             sleep(self.period)
         ROOTLOGGER.info("CFDNSUpdater stopped")
@@ -247,7 +246,6 @@ class CloudFlareDNSUpdaterMain(object):
         record_types_to_update = set()
         record_names_to_update = set()
         domain = parsed_args.domain
-        record_content = parsed_args.content
         period = parsed_args.period
         if parsed_args.recordtype is not None:
             for recordtype in parsed_args.recordtype:
@@ -264,7 +262,6 @@ class CloudFlareDNSUpdaterMain(object):
             CloudFlareDNSUpdater(email, apikey, domain,
                                  {"record_types":record_types_to_update,
                                   "record_names":record_names_to_update,
-                                  "record_content":record_content
                                  }), period))
         return updaters
 
@@ -309,9 +306,6 @@ class CloudFlareDNSUpdaterMain(object):
                    not isinstance(instance["names"], list):
                     raise ValueError("Invalid configuration:\
  Missing record names  in instance")
-                if not "content" in instance:
-                    raise ValueError("Invalid configuration:\
- Missing record_content in instance")
                 if not "domain" in instance:
                     raise ValueError("Invalid configuration:\
  Missing domain")
@@ -331,8 +325,7 @@ class CloudFlareDNSUpdaterMain(object):
                             apikey,
                             domain,
                             {"record_types":record_types_to_update,
-                             "record_names":record_names_to_update,
-                             "record_content":instance["content"]
+                             "record_names":record_names_to_update
                             }
                             ),
                         period))
@@ -466,10 +459,6 @@ class CloudFlareDNSUpdaterMain(object):
         inline_config_parser.add_argument(
             'domain',
             help='Domain to update',
-            type=str)
-        inline_config_parser.add_argument(
-            'content',
-            help='New content of records',
             type=str)
         inline_config_parser.add_argument(
             '--recordtype',
