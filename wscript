@@ -82,13 +82,18 @@ def configure(ctx):
         ctx.fatal("Missing requirements. Installation will not continue.")
     if checkPythonModule("argcomplete") == False:
         ctx.fatal("Missing requirements. Installation will not continue.")
+    if checkPythonModule("argcomplete") == False:
+        ctx.fatal("Missing requirements. Installation will not continue.")
+
 
 
 def build(ctx):
     srcPath = ctx.path.find_dir('src/')
+    etcPath = ctx.path.find_dir('src/etc/')
+    binPath = ctx.path.find_dir('src/bin/') 
 
     ctx.install_files(os.path.join(ctx.env.PREFIX,'bin'),
-      srcPath.ant_glob('**/cfdnsupdater'),cwd=srcPath,relative_trick=True)
-    ctx.install_files(os.path.join(ctx.env.PREFIX,'etc/default'),
-      srcPath.ant_glob('**/cfdnsupdater.conf.sample'),cwd=srcPath,relative_trick=True)
+       binPath.ant_glob('**/*'),cwd=binPath,relative_trick=True)
+    ctx.install_files(os.path.join(ctx.env.PREFIX,'etc'), etcPath.ant_glob('**/*'), 
+       cwd=etcPath, relative_trick=True) 
 
