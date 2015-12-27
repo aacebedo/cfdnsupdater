@@ -274,11 +274,11 @@ class CloudFlareDNSUpdaterMain(object):
         config_file = None
         try:
             config_file = open(parsed_args.config, "r", encoding="utf8")
-        except FileNotFoundError:
+        except FileNotFoundError as excpt:
             ROOTLOGGER.error(
                 "Unable to load configuration file '{}'\
  (file not found)".format(parsed_args.config))
-            return 1
+            raise excpt
 
         config_file_json = json.loads(config_file.read())
         if not "email" in config_file_json:
@@ -355,27 +355,26 @@ class CloudFlareDNSUpdaterMain(object):
         """
         Main function
         """
-
-        parsed_args = CloudFlareDNSUpdaterMain.parse_args(raw_args)
-        CloudFlareDNSUpdaterMain.init_loggers(parsed_args)
-
-        if parsed_args.verbose:
-            ROOTLOGGER.setLevel(logging.DEBUG)
-        elif parsed_args.veryverbose:
-            ROOTLOGGER.setLevel(4)
-        elif parsed_args.quiet:
-            ROOTLOGGER.setLevel(0)
-        else:
-            ROOTLOGGER.setLevel(logging.INFO)
-
-        updaters = []
-        if not hasattr(parsed_args, "config"):
-            updaters = CloudFlareDNSUpdaterMain.\
-                       process_inline_config(parsed_args)
-        else:
-            updaters = CloudFlareDNSUpdaterMain.process_file_config(parsed_args)
-
+        res = 0
         try:
+            parsed_args = CloudFlareDNSUpdaterMain.parse_args(raw_args)
+            CloudFlareDNSUpdaterMain.init_loggers(parsed_args)
+            ROOTLOGGER.setLevel(logging.INFO)
+            if parsed_args.verbose:
+                ROOTLOGGER.setLevel(logging.DEBUG)
+            elif parsed_args.veryverbose:
+                ROOTLOGGER.setLevel(4)
+            elif parsed_args.quiet:
+                ROOTLOGGER.setLevel(0)
+
+            updaters = []
+            if parsed_args.configtype == "inlineconfig":
+                updaters = CloudFlareDNSUpdaterMain.\
+                           process_inline_config(parsed_args)
+            else:
+                updaters = CloudFlareDNSUpdaterMain.\
+                           process_file_config(parsed_args)
+
             for updater in updaters:
                 updater.start()
             for updater in updaters:
@@ -385,9 +384,11 @@ class CloudFlareDNSUpdaterMain(object):
                 updater.stop()
             for updater in updaters:
                 updater.join()
+        except (ValueError, FileNotFoundError):
+            res = 1
         except SystemExit:
             pass
-        return 0
+        return res
 
     @staticmethod
     def add_common_args(parser):
@@ -432,7 +433,7 @@ class CloudFlareDNSUpdaterMain(object):
         parser = argparse.ArgumentParser(
             prog="CloudFlareDNSUpdater",
             description='Automtatic DNS updater for cloudflare.')
-        subparsers = parser.add_subparsers()
+        subparsers = parser.add_subparsers(dest="configtype")
         inline_config_parser = subparsers.add_parser(
             "inlineconfig",
             help="process configuration as inline parameters")
@@ -481,9 +482,7 @@ class CloudFlareDNSUpdaterMain(object):
             "fileconfig",
             help="process configuration in a file")
         file_config_parser.add_argument(
-            '--config',
-            '-c',
-            required=True,
+            'config',
             help='Config file',
             type=str)
 
@@ -491,7 +490,13 @@ class CloudFlareDNSUpdaterMain(object):
 
         # Parse the command
         argcomplete.autocomplete(parser)
-        return parser.parse_args(raw_args)
+        parsed_args = parser.parse_args(raw_args)
+
+        if parsed_args.configtype == None:
+            parser.print_usage()
+            print("CFDNSUpdater: error: too few arguments")
+            raise ValueError()
+        return parsed_args
 
 
 if __name__ == "__main__":
