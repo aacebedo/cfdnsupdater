@@ -1,0 +1,8 @@
+[Unit]
+Description=CFDNSUpdater
+
+[Service]
+ExecStart=/usr/local/bin/cfdnsupdater fileconfig -s /usr/local/etc/cfdnsupdater.conf
+
+[Install]
+WantedBy=multi-user.target

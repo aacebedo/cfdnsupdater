@@ -1,0 +1,12 @@
+{
+ "email":"user@fake.com",
+ "apikey":"get_your_api_key_from_your_cloud_flare_a_account",
+ "period":60,
+ "instances" : [
+  { 
+   "domain":"foo.com",
+   "types":["A"],
+   "names":["bar"]
+  }
+ ]
+}
