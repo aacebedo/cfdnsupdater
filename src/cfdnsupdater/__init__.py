@@ -19,3 +19,6 @@
 """
 This module contains the cfdnsupdater application
 """
+import sys
+if sys.version_info < (3,0):
+  sys.exit("CloudFlare DNS updater only supports python3. Please check your installation.")

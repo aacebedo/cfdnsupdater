@@ -19,17 +19,20 @@
 """
 Setup script for CFDNUpdater
 """
-
 import sys
+from setuptools import setup, find_packages
 import argparse
 import platform
-from setuptools import setup
 import os
+
 
 def process_setup():
     """
     Setup function
     """
+    if sys.version_info < (3,0):
+        sys.exit("CloudFlare DNS updater only supports python3. Please run setup.py with python3.")
+  
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--prefix", type=str)
     args, _ = parser.parse_known_args(sys.argv[1:])
@@ -47,10 +50,11 @@ def process_setup():
 
     setup(
         name="cfdnsupdater",
-        version="0.4",
-        packages=["src.cfdnsupdater"],
+        version="0.5",
+        packages=find_packages("src"),
+        package_dir ={'':'src'},
         data_files=data_files,
-        install_requires=['argcomplete>=1.0.0', 'requests>=2.9.1'],
+        install_requires=['argcomplete>=1.0.0','argparse>=1.0.0', 'requests>=2.9.1'],
         author="Alexandre ACEBEDO",
         author_email="Alexandre ACEBEDO",
         description="DNS updater for CloudFlare",
@@ -61,6 +65,7 @@ def process_setup():
                       ['cfdnsupdater = cfdnsupdater.__main__:\
                       CloudFlareDNSUpdaterMain.main']}
     )
-
+    
 if __name__ == "__main__":
     process_setup()
+    
