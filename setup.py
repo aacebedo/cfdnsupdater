@@ -62,8 +62,7 @@ def process_setup():
         keywords="cloudflare dns",
         url="http://github.com/aacebedo/cfdnsupdater",
         entry_points={'console_scripts':
-                      ['cfdnsupdater = cfdnsupdater.__main__:\
-                      CloudFlareDNSUpdaterMain.main']}
+                      ['cfdnsupdater = cfdnsupdater.__main__:CloudFlareDNSUpdaterMain.main']}
     )
     
 if __name__ == "__main__":
