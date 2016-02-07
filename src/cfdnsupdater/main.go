@@ -17,7 +17,10 @@ func main() {
 	  logger.Fatalf(err.Error())
 	}
 	 
-	utils.InitLoggers(config.Verbose, config.Quiet, config.Syslog)
+	err = utils.InitLoggers(config.Verbose, config.Quiet, config.Syslog)
+	if(err != nil) {
+	  logger.Fatalf(err.Error())
+	}
 	var wg sync.WaitGroup
 	wg.Add(len(config.DomainConfigs))
 	for _, domainConfig := range config.DomainConfigs {
