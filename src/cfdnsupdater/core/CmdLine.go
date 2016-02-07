@@ -12,15 +12,19 @@ import (
 const (
 	MIN_UPDATE_PERIOD = 10
 	MAX_UPDATE_PERIOD = 60 * 60
+	VERSION = "0.6"
 )
 
 type CommandLine struct {}
 
 func (self *CommandLine) ParseParameters(rawParams []string) (res *CFDNSUpdaterConfiguration, err error) {
 	app := kingpin.New("cfdnsupdater", "Automtatic DNS updater for cloudflare.")
+	
 	verbose := app.Flag("verbose", "Verbose mode.").Short('v').Bool()
 	quiet := app.Flag("quiet", "Quiet mode.").Short('q').Bool()
 	syslog := app.Flag("syslog", "Output logs to syslog.").Short('s').Bool()
+
+  version := app.Command("version", "Display Version.")
 
 	inlineconfig := app.Command("inlineconfig", "Pass configuration as inline parameters.")
 	email := inlineconfig.Flag("email", "Email used to login to cloudflare account.").Short('e').Required().String()
@@ -35,6 +39,8 @@ func (self *CommandLine) ParseParameters(rawParams []string) (res *CFDNSUpdaterC
   
 	res = &CFDNSUpdaterConfiguration{}
 	switch kingpin.MustParse(app.Parse(rawParams)) {
+	case version.FullCommand():
+	  fmt.Println(VERSION)
 	case inlineconfig.FullCommand():
 		config := DomainConfiguration{Email: *email, ApiKey: *apiKey, Domain: *domain, Period: *period}
 		if len(*recordtypes) > 0 {
@@ -56,6 +62,7 @@ func (self *CommandLine) ParseParameters(rawParams []string) (res *CFDNSUpdaterC
 		res.Verbose = *verbose
 		res.Quiet = *quiet
 		res.Syslog = *syslog
+		
 
 	case fileconfig.FullCommand():
 
