@@ -1,7 +1,9 @@
 package core
 
 import (
+  "cfdnsupdater/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/levigross/grequests"
 	"net"
@@ -10,140 +12,135 @@ import (
 	"time"
 )
 
-func GetPublicIP() net.IP {
-	var restSession = grequests.NewSession(nil)
-	var url = "https://api.ipify.org"
-	var resp, err = restSession.Get(url, nil)
-	if err == nil && resp.Ok {
-		return net.ParseIP(resp.String())
-	} else {
-		return nil
-	}
+type DomainUpdater struct {
+	domain      string
+	recordTypes RecordTypeSlice
+	recordNames []string
+	authParams  map[string]string
+	period      int
+	restSession *grequests.Session
 }
 
-func updateDomain(wg *sync.WaitGroup, domain string,
-	recordTypes *RecordTypeSlice, recordNames *[]string,
-	authParams map[string]string, period int) {
-	defer wg.Done()
-	var restSession = grequests.NewSession(nil)
-	var p = &grequests.RequestOptions{
-		Headers: authParams,
-		Params:  map[string]string{"name": domain},
+func GetPublicIP() (res net.IP, err error) {
+	restSession := grequests.NewSession(nil)
+	url := "https://api.ipify.org"
+	resp, err := restSession.Get(url, nil)
+	if err == nil && resp.Ok {
+		res = net.ParseIP(resp.String())
+	} else {
+		err = errors.New("")
 	}
-	RootLogger.Infof("Starting to monitor domain '%s' every %v seconds.",
-		domain, period)
-	var url = "https://api.cloudflare.com/client/v4/zones"
+	return
+}
 
+func NewDomainUpdater(domain string, email string, apiKey string, recordTypes RecordTypeSlice, recordNames []string, period int) (res *DomainUpdater) {
+	res = &DomainUpdater{}
+	res.restSession = grequests.NewSession(nil)
+	res.authParams = map[string]string{
+		"x-auth-email": email,
+		"x-auth-key":   apiKey,
+	}
+	res.domain     = domain
+	res.recordTypes = recordTypes
+	res.recordNames = recordNames
+	res.period = period
+	
+	return
+}
+
+func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
+	defer wg.Done()
+	logger.Infof("Starting to monitor domain '%s' every %v seconds.",
+		self.domain, self.period)
+	url := "https://api.cloudflare.com/client/v4/zones"
 	for {
-		var publicIP = GetPublicIP()
-		var resp, err = restSession.Get(url, p)
+		publicIP, _ := GetPublicIP()
+		resp, err := self.restSession.Get(url, &grequests.RequestOptions{
+			Headers: self.authParams,
+			Params:  map[string]string{"name": self.domain},
+		})
 
-		if err == nil && resp.Ok {
-			var zoneDetails ZoneRequestResult
-			var _ = json.Unmarshal([]byte(resp.String()), &zoneDetails)
+		if err != nil {
+			logger.Errorf("%s: %s", self.domain, err.Error())
+			return
+		}
+		if !resp.Ok {
+			logger.Errorf("%s: Unable to get domain's zones", self.domain)
+			return
+		}
 
-			if zoneDetails.Result_info.Total_count == 1 {
-				RootLogger.Debugf("Domain '%s' found. Processing it...", domain)
+		var zoneDetails ZoneRequestResult
+		err = json.Unmarshal([]byte(resp.String()), &zoneDetails)
 
-				for _, zoneDetail := range zoneDetails.Result {
-					RootLogger.Debugf("Getting DNS records for the domain '%s'",
-						zoneDetail.Name)
-					var url = fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", zoneDetail.Id)
-					var resp, err = restSession.Get(url, &grequests.RequestOptions{Headers: authParams})
+		if err != nil {
+			logger.Errorf("%s: %s", self.domain, err.Error())
+			return
+		}
 
-					if err == nil && resp.Ok {
-						var recordDetails RecordRequestResult
-						var _ = json.Unmarshal([]byte(resp.String()), &recordDetails)
+		if zoneDetails.Result_info.Total_count != 1 {
+			logger.Errorf("%s: Domain not found", self.domain)
+			return
+		}
 
-						for _, recordDetail := range recordDetails.Result {
-							RootLogger.Debugf("%s: Processing record %s:'%s'.",
-								zoneDetail.Name, recordDetail.Type, recordDetail.Name)
-							var recordIp = net.ParseIP(recordDetail.Content)
-              var recordType, convertErr = FromString(recordDetail.Type)
-							if !reflect.DeepEqual(recordIp, publicIP) && convertErr == nil &&
-								(recordTypes == nil || ((*recordTypes).Contains(recordType))) &&
-								(recordNames == nil || stringInSlice(recordDetail.Name, *recordNames)) {
+		logger.Debugf("Domain '%s' found. Processing it...", self.domain)
+		zoneDetail := zoneDetails.Result[0]
+		logger.Debugf("Getting DNS records for the domain '%s'", zoneDetail.Name)
+		url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records", zoneDetail.Id)
+		resp, err = self.restSession.Get(url, &grequests.RequestOptions{Headers: self.authParams})
 
-								RootLogger.Debugf("%s: Record %s:'%s' needs to be updated",
-									zoneDetail.Name,
-									recordDetail.Type,
-									recordDetail.Name)
+		if err != nil {
+			logger.Errorf("%s: %s", self.domain, err.Error())
+			return
+		}
 
-								recordDetail.Content = publicIP.String()
-								var url = fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s",
-									zoneDetail.Id, recordDetail.Id)
-								var resp, err = restSession.Put(url,
-									&grequests.RequestOptions{
-										Headers: authParams,
-										JSON:    recordDetail,
-									})
+		if !resp.Ok {
+			logger.Errorf("%s: Unable to get DNS records", self.domain)
+			return
+		}
 
-								if err == nil && resp.Ok {
-									RootLogger.Infof("%s: Record %s:%s successfully updated with value %s",
-										zoneDetail.Name,
-										recordDetail.Type,
-										recordDetail.Name,
-										recordDetail.Content)
-								} else {
-									var errMsg string
+		var recordDetails RecordRequestResult
+		err = json.Unmarshal([]byte(resp.String()), &recordDetails)
+		if err != nil {
+			logger.Errorf("%s: %s", self.domain, err.Error())
+			return
+		}
+RECORD_PROCESSING:
+		for _, recordDetail := range recordDetails.Result {
+			logger.Debugf("%s: Processing record %s:'%s'.",
+				zoneDetail.Name, recordDetail.Type, recordDetail.Name)
+			recordIp := net.ParseIP(recordDetail.Content)
+			recordType, convertErr := FromString(recordDetail.Type)
+			if !reflect.DeepEqual(recordIp, publicIP) && convertErr == nil &&
+				(len(self.recordTypes) == 0 || (self.recordTypes.Contains(recordType))) &&
+				(len(self.recordNames) == 0 || utils.StringInSlice(recordDetail.Name, 
+				                                                self.recordNames)) {
+				logger.Debugf("%s: Record %s:'%s' needs to be updated",
+					self.domain, recordDetail.Type, recordDetail.Name)
 
-									if err != nil {
-										errMsg = err.Error()
-									} else {
-										errMsg = resp.String()
-									}
+				recordDetail.Content = publicIP.String()
+				url := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s",
+					zoneDetail.Id, recordDetail.Id)
+				resp, err = self.restSession.Put(url,&grequests.RequestOptions{
+						                                          Headers: self.authParams,
+						                                          JSON:    recordDetail,})
+				if err != nil {
+					logger.Warningf("%s: Record ignored (%s)", self.domain, err.Error())
+					continue RECORD_PROCESSING
+				}
 
-									RootLogger.Errorf("%s: Unable to update Record %s:'%s: %s",
-										zoneDetail.Name, recordDetail.Type, recordDetail.Name, errMsg)
-								}
-							} else {
-								RootLogger.Infof("%s: Record %s:'%s': ignored",
-									 zoneDetail.Name, recordDetail.Type, recordDetail.Name)
-							}
-						}
-					} else {
-						var errMsg string
-						if err != nil {
-							errMsg = err.Error()
-						} else {
-							errMsg = resp.String()
-						}
-						RootLogger.Errorf("%s: Unable to get records: %s",
-							zoneDetail.Name, errMsg)
-					}
-
+				if !resp.Ok {
+					logger.Warningf("%s: Unable to update DNS record '%s:%s'", self.domain,recordDetail.Type, recordDetail.Name)
+				} else {
+					logger.Infof("%s: Record %s:%s successfully updated with value %s",
+						zoneDetail.Name,
+						recordDetail.Type,
+						recordDetail.Name,
+						recordDetail.Content)
 				}
 			} else {
-				RootLogger.Errorf("%s: No records found", domain)
+			  logger.Debugf("%s: Record %s:'%s' ignored", zoneDetail.Name, recordDetail.Type, recordDetail.Name)
 			}
-		} else {
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			} else {
-				errMsg = resp.String()
-			}
-			RootLogger.Error("Unable to get zones for domain '%s': %s",
-				domain, errMsg)
 		}
-		time.Sleep(time.Duration(period) * time.Second)
+		time.Sleep(time.Duration(self.period) * time.Second)
 	}
-}
-
-func SpawnDomainUpdaters(configs []DomainConfig) {
-	var wg sync.WaitGroup
-	wg.Add(3)
-	for _, config := range configs {
-		var headers = map[string]string{
-			"x-auth-email": config.Email,
-			"x-auth-key":   config.ApiKey,
-		}
-		go updateDomain(&wg, 
-		  config.Domain, 
-		  config.RecordTypes,
-		  config.RecordNames, 
-		  headers, 
-		  config.Period)
-	}
-	wg.Wait()
 }

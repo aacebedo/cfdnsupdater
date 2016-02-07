@@ -31,30 +31,32 @@ func (self *RecordType) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-func (self RecordType) String() (string, error) {
-	var conversionArray = []string{"A", "AAAA", "CNAME", "MX", "LOC", "SRV", "SPF", "TXT", "NS"}
+func (self RecordType) String() (res string, err error) {
+	conversionArray := []string{"A", "AAAA", "CNAME", "MX", "LOC", "SRV", "SPF", "TXT", "NS"}
 	if int(self) < len(conversionArray) {
-		return conversionArray[self], nil
+		res = conversionArray[self]
 	} else {
-		return string(""), errors.New("Invalid type of record")
+		err = errors.New("Invalid type of record")
 	}
+	return
 }
 
-func (self RecordTypeSlice) Contains(valueToSearch RecordType) bool {
+func (self RecordTypeSlice) Contains(valueToSearch RecordType) (res bool) {
+	res = false
 	for _, v := range self {
 		if v == valueToSearch {
-			return true
+			res = true
+			break
 		}
 	}
-	return false
+	return
 }
 
 func FromString(valToConvert string) (res RecordType, err error) {
-	var conversionArray = []string{"A", "AAAA", "CNAME", "MX", "LOC", "SRV", "SPF", "TXT", "NS"}
+	conversionArray := []string{"A", "AAAA", "CNAME", "MX", "LOC", "SRV", "SPF", "TXT", "NS"}
 	for p, v := range conversionArray {
 		if v == valToConvert {
 			res = RecordType(p)
-			err=nil
 			return
 		}
 	}
