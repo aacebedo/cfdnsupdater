@@ -21,17 +21,6 @@ type DomainUpdater struct {
 	restSession *grequests.Session
 }
 
-func GetPublicIP() (res net.IP, err error) {
-	restSession := grequests.NewSession(nil)
-	url := "https://api.ipify.org"
-	resp, err := restSession.Get(url, nil)
-	if err == nil && resp.Ok {
-		res = net.ParseIP(resp.String())
-	} else {
-		err = errors.New("")
-	}
-	return
-}
 
 func NewDomainUpdater(domain string, email string, apiKey string, recordTypes RecordTypeSlice, recordNames []string, period int) (res *DomainUpdater) {
 	res = &DomainUpdater{}
@@ -48,13 +37,26 @@ func NewDomainUpdater(domain string, email string, apiKey string, recordTypes Re
 	return
 }
 
+func (self *DomainUpdater) GetPublicIP() (res net.IP, err error) {
+	
+	url := "https://api.ipify.org"
+	resp, err := self.restSession.Get(url, nil)
+	if err == nil && resp.Ok {
+		res = net.ParseIP(resp.String())
+	} else {
+		err = errors.New("")
+	}
+	return
+}
+
 func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
 	defer wg.Done()
 	logger.Infof("Starting to monitor domain '%s' every %v seconds.",
 		self.domain, self.period)
 	url := "https://api.cloudflare.com/client/v4/zones"
 	for {
-		publicIP, _ := GetPublicIP()
+		publicIP, _ := self.GetPublicIP()
+		logger.Infof("Public IPAddress is %v",publicIP)
 		resp, err := self.restSession.Get(url, &grequests.RequestOptions{
 			Headers: self.authParams,
 			Params:  map[string]string{"name": self.domain},
