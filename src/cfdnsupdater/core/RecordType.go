@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -22,12 +21,14 @@ const (
 	NS    RecordType = 8
 )
 
-func (self *RecordType) UnmarshalJSON(b []byte) (err error) {
-	var val string
-	if err = json.Unmarshal(b, &val); err == nil {
-		*self, err = FromString(val)
-		return
-	}
+
+
+
+func (self *RecordType) UnmarshalYAML(unmarshal func(interface{}) error) (err error) {
+  var val string
+  if err = unmarshal(&val); err == nil {
+      *self, err = FromString(val)
+  }
 	return
 }
 
