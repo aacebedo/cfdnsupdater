@@ -13,5 +13,6 @@ ADD https://github.com/aacebedo/cfdnsupdater/releases/download/${CFDNSUPDATER_VE
 RUN tar xvzf /tmp/cfdnsupdater.tar.gz -C /usr/local/bin
 RUN rm -rf /tm p/cfdnsupdater.tar.gz
 
+
 ENTRYPOINT ["cfdnsupdater"]
 
