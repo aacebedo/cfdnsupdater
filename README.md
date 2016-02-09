@@ -9,17 +9,19 @@ by type or by name. The information updated is always the public IP of the serve
 
 Logs can be outputed in stdout or syslog. Check the help for more information about how to enable it.
 
-### Requirements
-- Python >= 3.0
-- argparse
-- argcomplete >= 1.0.0
-- requests >= 2.9.1
+### Build
+#### Requirements
+- Docker >=1.9
+
+#### Instructions
+```sh
+$ docker build -t cfdnsupdaterbuild ./environments/build
+$ docker run -t -v <output_path_on_host>:/out cfdnsupdaterbuild <ARCH> [-b <BRANCH or TAG>]
+```
 
 ### Installation
 ```sh
-$ ./setup.py install
-or
-$ pip3 install cfdnsupdater
+$ tar xvzf ./cfdnsupdater.<ARCH>.<VERSION>.tar.gz
 ```
 Note: I also provide a systemd file you can manually install wherever in the appropriate directory ("/etc/systemd/system" for instance).
 
