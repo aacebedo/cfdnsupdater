@@ -1,7 +1,8 @@
-package core
+package updater
 
 import (
   "cfdnsupdater/utils"
+  "cfdnsupdater/core"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 
 type DomainUpdater struct {
 	domain      string
-	recordTypes RecordTypeSlice
+	recordTypes core.RecordTypeSlice
 	recordNames []string
 	authParams  map[string]string
 	period      int
@@ -22,7 +23,7 @@ type DomainUpdater struct {
 }
 
 
-func NewDomainUpdater(domain string, email string, apiKey string, recordTypes RecordTypeSlice, recordNames []string, period int) (res *DomainUpdater) {
+func NewDomainUpdater(domain string, email string, apiKey string, recordTypes core.RecordTypeSlice, recordNames []string, period int) (res *DomainUpdater) {
 	res = &DomainUpdater{}
 	res.restSession = grequests.NewSession(nil)
 	res.authParams = map[string]string{
@@ -55,6 +56,7 @@ func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
 		self.domain, self.period)
 	url := "https://api.cloudflare.com/client/v4/zones"
 	var previousIP net.IP
+SLEEP_PERIOD:
 	for {
 		publicIP, _ := self.GetPublicIP()
 		if !reflect.DeepEqual(previousIP, publicIP) {
@@ -67,25 +69,25 @@ func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
 	
 			if err != nil {
 				logger.Errorf("%s: %s", self.domain, err.Error())
-				return
+				continue SLEEP_PERIOD
 			}
 			if !resp.Ok {
 				logger.Errorf("%s: Unable to get domain's zones: %v", self.domain, 
 					resp)
-				return
+				continue SLEEP_PERIOD
 			}
 	
-			var zoneDetails ZoneRequestResult
+			var zoneDetails core.ZoneRequestResult
 			err = json.Unmarshal([]byte(resp.String()), &zoneDetails)
 	
 			if err != nil {
 				logger.Errorf("%s: %s", self.domain, err.Error())
-				return
+				continue SLEEP_PERIOD
 			}
 	
 			if zoneDetails.Result_info.Total_count != 1 {
 				logger.Errorf("%s: Domain not found", self.domain)
-				return
+				continue SLEEP_PERIOD
 			}
 	
 			logger.Debugf("Domain '%s' found. Processing it...", self.domain)
@@ -96,15 +98,15 @@ func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
 	
 			if err != nil {
 				logger.Errorf("%s: %s", self.domain, err.Error())
-				return
+				continue SLEEP_PERIOD
 			}
 	
 			if !resp.Ok {
 				logger.Errorf("%s: Unable to get DNS records", self.domain)
-				return
+				continue SLEEP_PERIOD
 			}
 	
-			var recordDetails RecordRequestResult
+			var recordDetails core.RecordRequestResult
 			err = json.Unmarshal([]byte(resp.String()), &recordDetails)
 			if err != nil {
 				logger.Errorf("%s: %s", self.domain, err.Error())
@@ -115,7 +117,7 @@ RECORD_PROCESSING:
 				logger.Debugf("%s: Processing record %s:'%s'.",
 					zoneDetail.Name, recordDetail.Type, recordDetail.Name)
 				recordIp := net.ParseIP(recordDetail.Content)
-				recordType, convertErr := FromString(recordDetail.Type)
+				recordType, convertErr := core.FromString(recordDetail.Type)
 				if !reflect.DeepEqual(recordIp, publicIP) && convertErr == nil &&
 					(len(self.recordTypes) == 0 || (self.recordTypes.Contains(recordType))) &&
 					(len(self.recordNames) == 0 || !utils.StringInSlice(recordDetail.Name, 
