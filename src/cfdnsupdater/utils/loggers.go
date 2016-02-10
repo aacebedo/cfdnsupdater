@@ -39,7 +39,7 @@ func InitLoggers(verbose bool, quiet bool, loggingMode LoggingMode) (err error) 
 		format = logging.MustStringFormatter(`%{color}%{time:15:04:05.000} | %{level:.10s} ▶%{color:reset} %{message}`)
 	case Filelog:
 	  var file *os.File
-	  file, err = os.OpenFile(filepath.Join("/","tmp","cfdnsupdater"), os.O_RDWR|os.O_CREATE, 0600)
+	  file, err = os.OpenFile(filepath.Join("/","var","log","cfdnsupdater"), os.O_RDWR|os.O_CREATE, 0600)
 	  if err != nil {
 	    return
 	  }
