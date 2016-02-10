@@ -49,8 +49,8 @@ def build(project, branch, arch, bin_name):
   if err != None:
     os.exit("Error while building project: {}".format(err))
   
-  with tarfile.open(os.path.join("/", "out","project", "{}.{}.{}.tar.gz".format(bin_name, branch, arch)), "w:gz") as tar:
-    tar.add(os.path.join("/", "out", "project", "bin", bin_name))
+  with tarfile.open(os.path.join("/", "out","project", "{}.{}.{}.tar.gz".format(bin_name, arch, branch)), "w:gz") as tar:
+    tar.add(os.path.join("/", "out", "project", "bin", bin_name), arcname=bin_name)
 
 
 if __name__ == "__main__":

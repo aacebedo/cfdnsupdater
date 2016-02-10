@@ -1,0 +1,13 @@
+from gliderlabs/alpine
+
+RUN apk add  --no-cache ca-certificates
+
+ARG VERSION
+
+ADD https://github.com/aacebedo/cfdnsupdater/releases/download/${VERSION}/cfdnsupdater.amd64.${VERSION}.tar.gz /tmp/cfdnsupdater.tar.gz
+RUN tar xvzf /tmp/cfdnsupdater.tar.gz -C /usr/local/bin
+RUN rm -rf /tmp/cfdnsupdater.tar.gz
+
+
+ENTRYPOINT ["cfdnsupdater"]
+
