@@ -58,7 +58,7 @@ func (self *DomainUpdater) Run(wg *sync.WaitGroup) {
 SLEEP_PERIOD:
 	for {
 		publicIP, err := self.GetPublicIP()
-		if err != nil {
+		if err == nil {
 			if !reflect.DeepEqual(previousIP, publicIP) {
 				previousIP = publicIP
 				logger.Infof("Public IPAddress is %v", publicIP)

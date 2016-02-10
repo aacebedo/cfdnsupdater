@@ -2,6 +2,7 @@ package configuration
 
 import (
     "cfdnsupdater/core"
+    "cfdnsupdater/utils"
   )
 
 
@@ -14,8 +15,8 @@ type DomainConfiguration struct {
 }
 
 type CFDNSUpdaterConfiguration struct {
-	Verbose       bool           
-	Quiet         bool           
-	Syslog        bool           
+	Verbose       bool
+	Quiet         bool
+	LoggingMode   utils.LoggingMode
 	DomainConfigs map[string]DomainConfiguration
 }
