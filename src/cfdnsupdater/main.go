@@ -17,7 +17,7 @@ func main() {
 	if(err != nil) {
 	  logger.Fatalf(err.Error())
 	}
-	err = utils.InitLoggers(config.Verbose, config.Quiet, config.Syslog)
+	err = utils.InitLoggers(config.Verbose, config.Quiet, config.LoggingMode)
 	if(err != nil) {
 	  logger.Fatalf(err.Error())
 	}
