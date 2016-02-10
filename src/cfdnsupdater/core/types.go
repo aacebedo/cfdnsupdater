@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -22,12 +21,11 @@ const (
 	NS    RecordType = 8
 )
 
-func (self *RecordType) UnmarshalJSON(b []byte) (err error) {
-	var val string
-	if err = json.Unmarshal(b, &val); err == nil {
-		*self, err = FromString(val)
-		return
-	}
+func (self *RecordType) UnmarshalYAML(unmarshal func(interface{}) error) (err error) {
+  var val string
+  if err = unmarshal(&val); err == nil {
+      *self, err = FromString(val)
+  }
 	return
 }
 
@@ -62,4 +60,24 @@ func FromString(valToConvert string) (res RecordType, err error) {
 	}
 	err = errors.New(fmt.Sprintf("'%s' is not a valid record type", valToConvert))
 	return
+}
+
+
+type RecordRequestResult struct {
+	Result []struct {
+		Name    string `json:"name"`
+		Type    string `json:"type"`
+		Content string `json:"content"`
+		Id      string `json:"id"`
+	}
+}
+
+type ZoneRequestResult struct {
+	Result []struct {
+		Name string `json:"name"`
+		Id   string `json:"id"`
+	}
+	Result_info struct {
+		Total_count int `json:"total_count"`
+	}
 }

@@ -16,7 +16,7 @@ Logs can be outputed in stdout or syslog. Check the help for more information ab
 #### Instructions
 ```sh
 $ docker build -t cfdnsupdaterbuild ./environments/build
-$ docker run -t -v <output_path_on_host>:/out cfdnsupdaterbuild <ARCH> [-b <BRANCH or TAG>]
+$ docker run -t -v <output_path_on_host>:/out cfdnsupdaterbuild -a <ARCH> [-b <BRANCH or TAG>]
 ```
 
 ### Installation
@@ -26,31 +26,18 @@ $ tar xvzf ./cfdnsupdater.<ARCH>.<VERSION>.tar.gz
 Note: I also provide a systemd file you can manually install wherever in the appropriate directory ("/etc/systemd/system" for instance).
 
 ### Use
-There are two ways to use this script:
-##### Inline config use
-Starting with a configuration passeed in the command line:
-```sh
-$ cfdnsupdater inlineconfig -e <cloudflare_account_email> -a <cloudflare_apikey> -t <record_types> <domain>
-```
-##### File config use
-Starting with a file containing the configuration:
+##### Inline config use##### File config use
 ```sh
 $ cfdnsupdater fileconfig -c <path_to_configuration_file>
 ```
 Here is an example of a configuration file (also included in the distribution):
 ```sh
-{
- "email":"user@fake.com",
- "apikey":"get_your_api_key_from_your_cloud_flare_a_account",
- "period":60,
- "instances" : [
-  { 
-   "domain":"foo.com",
-   "types":["A"],
-   "names":["bar"]
-  }
- ]
-}
+foo.com:
+  email: user@fake.com
+  apikey: get_your_api_key_from_your_cloud_flare_a_account
+  period: 60
+  record_types: []
+  record_names: []
 ```
 ##### More Help
 ```sh
