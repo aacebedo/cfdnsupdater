@@ -1,0 +1,47 @@
+sudo: required
+  
+language: go
+go:
+  - 1.5
+
+services:
+  - docker
+
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y --force-yes -q docker-engine
+  - docker build -t aacebedo/cfdnsupdaterbuild environments/build
+  - sudo mkdir -m 777 -p /build/amd64 
+  - sudo mkdir -m 777 -p /build/arm
+  
+script: 
+  - docker version
+  - docker run -t -v /build/amd64:/build aacebedo/cfdnsupdaterbuild -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a amd64 -dc "Cloudflare DNS updater" -u aacebedo -d wily -o /build -li LGPL-3.0 
+  - docker run -t -v /build/arm:/build aacebedo/cfdnsupdaterbuild -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a arm -dc "Cloudflare DNS updater" -u aacebedo -d wily -o /build -li LGPL-3.0
+
+deploy:
+  - provider: bintray
+    file: /build/amd64/bintray.desc
+    user: $BINTRAY_USERNAME
+    key: $BINTRAY_APIKEY
+    dry-run: false
+    on:
+      tags: true
+  - provider: releases
+    api-key: $GITHUB_TOKEN
+    file:
+      - /build/amd64/cfdnsupdater.tar.gz
+      - /build/arm/cfdnsupdater.tar.gz
+    skip_cleanup: true
+    on:
+      tags: true
+#  - provider: script
+#    script: ./docker_deploy.sh amd64
+#    on:
+#      tags: true
+      
+#after_deploy:
+ # - docker login -u $BINTRAY_USERNAME -p $BINTRAY_APIKEY -e $BINTRAY_EMAIL aacebedo-docker-cfdsnupdater.bintray.io 
+ # - docker build -f  environments/run/Dockerfile.amd64 -t aacebedo/cfdnsupdater-amd64 .
+ # - docker tag $ID aacebedo/cfdnsupdater-amd64:$TRAVIS_BRANCH
+ # - docker push aacebedo/cfdnsupdater-amd64:$TRAVIS_BRANCH
