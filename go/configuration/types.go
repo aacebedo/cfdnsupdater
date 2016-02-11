@@ -16,8 +16,8 @@
 package configuration
 
 import (
-    "cfdnsupdater/core"
-    "cfdnsupdater/utils"
+    "github.com/aacebedo/cfdnsupdater/go/core"
+    "github.com/aacebedo/cfdnsupdater/go/utils"
   )
 
 
@@ -26,7 +26,7 @@ type DomainConfiguration struct {
 	ApiKey      string               `yaml:"apikey"`
 	Period      int                  `yaml:"period"`
 	RecordNames []string             `yaml:"record_names"`
-	RecordTypes core.RecordTypeSlice      `yaml:"record_types"`
+	RecordTypes core.RecordTypeSlice `yaml:"record_types"`
 }
 
 type CFDNSUpdaterConfiguration struct {

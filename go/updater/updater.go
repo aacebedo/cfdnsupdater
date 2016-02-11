@@ -16,8 +16,8 @@
 package updater
 
 import (
-	"cfdnsupdater/core"
-	"cfdnsupdater/utils"
+	"github.com/aacebedo/cfdnsupdater/go/core"
+	"github.com/aacebedo/cfdnsupdater/go/utils"
 	"encoding/json"
 	"errors"
 	"fmt"

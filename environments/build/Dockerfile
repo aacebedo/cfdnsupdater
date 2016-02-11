@@ -14,9 +14,14 @@
 #    along with CFDNSUpdater.  If not, see <http://www.gnu.org/licenses/>.
 
 from alpine
-RUN apk add --update go git python3 bash
+RUN apk update
+RUN apk upgrade
+RUN apk add go git python3 bash ruby-dev gcc make ruby ruby-bundler \
+ g++ libstdc++ libffi-dev ruby-rdoc
+RUN gem install fpm
 
 ENV GOPATH /go
+ENV GOBIN /go/bin/usr/local/bin
 ENV CGO_ENABLED=0
 
 ADD ./build.py /usr/bin
@@ -25,7 +30,7 @@ RUN chmod u+x /usr/bin/build.py
 WORKDIR /out
 VOLUME ["/out"]
 
-ENTRYPOINT ["build.py", "-p", "aacebedo/cfdnsupdater", "-n", "cfdnsupdater"]
+#ENTRYPOINT ["build.py", "-p", "aacebedo/cfdnsupdater", "-n", "cfdnsupdater"]
 
 
 

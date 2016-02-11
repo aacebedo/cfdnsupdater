@@ -22,7 +22,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"math"
-	"cfdnsupdater/utils"
+	"github.com/aacebedo/cfdnsupdater/go/utils"
 )
 
 const (
