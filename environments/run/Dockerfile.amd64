@@ -13,16 +13,15 @@
 #    You should have received a copy of the GNU General Public License
 #    along with CFDNSUpdater.  If not, see <http://www.gnu.org/licenses/>.
 
-from gliderlabs/alpine
+from alpine
 
 RUN apk add  --no-cache ca-certificates
 
 ARG VERSION
 
-ADD https://github.com/aacebedo/cfdnsupdater/releases/download/${VERSION}/cfdnsupdater.amd64.${VERSION}.tar.gz /tmp/cfdnsupdater.tar.gz
-RUN tar xvzf /tmp/cfdnsupdater.tar.gz -C /usr/local/bin
-RUN rm -rf /tmp/cfdnsupdater.tar.gz
-
+ADD https://github.com/aacebedo/cfdnsupdater/releases/download/${VERSION}/cfdnsupdater.amd64.${VERSION}.tar /tmp/cfdnsupdater.tar
+RUN tar xvf /tmp/cfdnsupdater.tar -C /
+RUN rm -rf /tmp/cfdnsupdater.tar
 
 ENTRYPOINT ["cfdnsupdater"]
 
