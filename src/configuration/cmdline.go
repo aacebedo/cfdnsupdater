@@ -28,7 +28,7 @@ import (
 const (
 	MIN_UPDATE_PERIOD = 10
 	MAX_UPDATE_PERIOD = 60 * 60
-	VERSION           = "0.9"
+	VERSION           = "0.9.1"
 )
 
 type CommandLine struct{}
