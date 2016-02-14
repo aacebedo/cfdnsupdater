@@ -1,0 +1,53 @@
+sudo: required
+  
+language: go
+go:
+  - 1.5
+
+services:
+  - docker
+
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y --force-yes -q docker-engine
+  - docker build -t aacebedo/cfdnsupdaterbuild environments/build
+  - sudo mkdir -m 777 -p /build/vivid/amd64 /build/vivid/arm
+  - sudo mkdir -m 777 -p /build/wily/amd64 /build/wily/arm
+  - sudo mkdir -m 777 -p /build/xenial/amd64 /build/xenial/arm
+  
+script: 
+  - docker run -t -v /build/vivid/amd64:/build aacebedo/cfdnsupdaterbuild build  -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a amd64 -o /build 
+  - docker run -t -v /build/vivid/arm:/build aacebedo/cfdnsupdaterbuild build  -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a arm  -o /build
+  - docker run -t -v /build/wily/amd64:/build aacebedo/cfdnsupdaterbuild build  -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a amd64 -o /build
+  - docker run -t -v /build/wily/arm:/build aacebedo/cfdnsupdaterbuild build -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a arm -o /build
+  - docker run -t -v /build/xenial/amd64:/build aacebedo/cfdnsupdaterbuild build -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a amd64 -o /build 
+  - docker run -t -v /build/xenial/arm:/build aacebedo/cfdnsupdaterbuild build -p aacebedo/cfdnsupdater -bn cfdnsupdater -b $TRAVIS_BRANCH -a arm -o /build
+  - docker run -t -v /build:/build aacebedo/cfdnsupdaterbuild  deploydesc -bn cfdnsupdater -b $TRAVIS_BRANCH -dc "Cloudflare DNS updater" -u aacebedo -li LGPL-3.0 -o /build
+
+after_success:
+  - sudo chmod -R a+rwX /build
+  - mv /build/xenial/amd64/cfdnsupdater.tar /build/cfdnsupdater.amd64.$TRAVIS_BRANCH.tar
+  - mv /build/xenial/arm/cfdnsupdater.tar /build/cfdnsupdater.arm.$TRAVIS_BRANCH.tar
+  
+deploy:
+  - provider: bintray
+    skip_cleanup: true
+    file: /build/bintray.desc
+    user: $BINTRAY_USERNAME
+    key: $BINTRAY_APIKEY
+    dry-run: false
+    on:
+      tags: true
+  - provider: releases
+    skip_cleanup: true
+    api-key:
+       secure: $GITHUB_TOKEN
+    file:
+      - /build/cfdnsupdater.amd64.$TRAVIS_BRANCH.tar
+      - /build/cfdnsupdater.arm.$TRAVIS_BRANCH.tar
+    on:
+      tags: true
+  - provider: script
+    script: docker login -u $BINTRAY_USERNAME -p $BINTRAY_APIKEY -e $BINTRAY_EMAIL aacebedo-docker-cfdsnupdater.bintray.io && docker build --build-arg VERSION=$TRAVIS_BRANCH -f environments/run/Dockerfile.amd64 -t aacebedo/cfdnsupdater-amd64 . && docker tag aacebedo/cfdnsupdater-amd64 aacebedo-docker-cfdsnupdater.bintray.io/cfdnsupdater-amd64:$TRAVIS_BRANCH && docker push aacebedo-docker-cfdsnupdater.bintray.io/cfdnsupdater-amd64:$TRAVIS_BRANCH
+    on:
+      tags: true

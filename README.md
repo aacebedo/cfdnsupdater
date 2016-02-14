@@ -23,10 +23,17 @@ It can be built like any other Go apps. However I provide a Dockerfile
 to ease the process. Execute the following commands.
 ```sh
 $ docker build -t cfdnsupdaterbuild ./environments/build
-$ docker run -t -v <output_path_on_host>:/out cfdnsupdaterbuild -a <ARCH> [-b <BRANCH or TAG>]
+$ docker run -t -v <output_path_on_host>:/build cfdnsupdaterbuild -a <ARCH> \
+             [-b <BRANCH or TAG>] -p aacebedo/cfdnsupdater -bn cfdnsupdater -o /build 
 ```
-
+This command will create a tar gz and debian file in the build directory 
+of the container.
+ 
 ### Installation
+There are multiple ways to install the software. Package for ARM and amd64
+available for each methods.
+
+#### Archive 
 Get an archive on github and execute the following commands.
 ```sh
 $ tar xvzf ./cfdnsupdater.<ARCH>.<VERSION>.tar.gz
@@ -34,10 +41,26 @@ $ tar xvzf ./cfdnsupdater.<ARCH>.<VERSION>.tar.gz
 Note: I also provide a systemd file you can manually install in the 
 appropriate directory ("/etc/systemd/system" for instance).
 
+#### Debian repository
+Add the following debian repository to your apt source and install it through
+apt-get
+```sh
+$ "deb https://dl.bintray.com/aacebedo/cfdnsupdater <DISTRIBUTION> main" | \
+      sudo tee -a /etc/apt/sources.list
+$ sudo apt update
+$ sudo  apt install cfdnsupdater
+```
+
+#### Docker registry
+Pull the docker image and run it in a container
+```sh
+docker pull aacebedo-docker-cfdsnupdater.bintray.io/cfdnsupdater-amd64:<VERSION> 
+```
+
 ### Use
 
 ```sh
-$ cfdnsupdater fileconfig -c <path_to_configuration_file>
+$ cfdnsupdater -c <path_to_configuration_file>
 ```
 Here is an example of a configuration file (also included in the distribution):
 ```sh
