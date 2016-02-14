@@ -76,12 +76,13 @@ def generateTmpDir():
   return tmp_dir_path
     
 def generatePackage(build_dir_path,
-                    package_type, package_name, version, arch):
+                    package_type, package_name, version, arch, project):
   process = subprocess.Popen(["fpm", "-t", package_type,
                                  "-n", package_name,
                                  "-p", build_dir_path,
                                  "-a", arch,
                                  "-f",
+                                 "--url","https://www.github.com/{}".format(project),
                                  "-v", version.replace("/", "_"),
                                   "-C", os.path.join(build_dir_path, "packaging"),
                                  "-s", "dir", "."], shell=False)
@@ -200,9 +201,9 @@ if __name__ == "__main__":
           args.project, args.branch,
           args.arch, args.binname)
       generatePackage(args.outputdirpath, "deb", args.binname,
-                    args.branch, args.arch)
+                    args.branch, args.arch, args.project)
       generatePackage(args.outputdirpath, "tar", args.binname,
-                    args.branch, args.arch)
+                    args.branch, args.arch, args.project)
     else:
       generateBintrayDescriptor(args.outputdirpath,
                                 args.binname,
