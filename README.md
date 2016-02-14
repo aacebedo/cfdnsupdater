@@ -1,4 +1,5 @@
 # CloudFlare DNS Updater
+[![Build Status](https://travis-ci.org/aacebedo/cfdnsupdater.svg?branch=master)](https://travis-ci.org/aacebedo/cfdnsupdater)
 
 This tool helps fools like me to cope with shitty ISP which does not provide a 
 static IP to their customers. It automatically updates DNS settings of any 
