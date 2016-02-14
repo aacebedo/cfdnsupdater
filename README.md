@@ -17,24 +17,31 @@ Check the help for more information about how to enable it.
 ### Build
 #### Requirements
 - Docker >=1.9
+- Go >=1.5
 
-#### Build Instructions
-It can be built like any other Go apps. However I provide a Dockerfile
-to ease the process. Execute the following commands.
+#### Build with docker 
+Execute the following commands:
 ```sh
 $ docker build -t cfdnsupdaterbuild ./environments/build
 $ docker run -t -v <output_path_on_host>:/build cfdnsupdaterbuild -a <ARCH> \
-             [-b <BRANCH or TAG>] -p aacebedo/cfdnsupdater -bn cfdnsupdater -o /build 
+       [-b <BRANCH or TAG>] -p aacebedo/cfdnsupdater -bn cfdnsupdater -o /build 
 ```
 This command will create a tar gz and debian file in the build directory 
 of the container.
+
+#### Build with go
+
+Execute the following commands in a environment with go command availabled
+```sh
+$ go get github.com/aacebedo/cfdnsupdater ./... 
+```
  
 ### Installation
 There are multiple ways to install the software. Package for ARM and amd64
 available for each methods.
 
 #### Archive 
-Get an archive on github and execute the following commands.
+Get an archive on github and execute the following commands:
 ```sh
 $ tar xvzf ./cfdnsupdater.<ARCH>.<VERSION>.tar.gz
 ```
@@ -43,7 +50,7 @@ appropriate directory ("/etc/systemd/system" for instance).
 
 #### Debian repository
 Add the following debian repository to your apt source and install it through
-apt-get
+apt-get:
 ```sh
 $ "deb https://dl.bintray.com/aacebedo/cfdnsupdater <DISTRIBUTION> main" | \
       sudo tee -a /etc/apt/sources.list
@@ -52,13 +59,12 @@ $ sudo  apt install cfdnsupdater
 ```
 
 #### Docker registry
-Pull the docker image and run it in a container
+Pull the docker image and run it in a container:
 ```sh
 docker pull aacebedo-docker-cfdsnupdater.bintray.io/cfdnsupdater-amd64:<VERSION> 
 ```
 
 ### Use
-
 ```sh
 $ cfdnsupdater -c <path_to_configuration_file>
 ```
