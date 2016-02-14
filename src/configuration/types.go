@@ -16,8 +16,8 @@
 package configuration
 
 import (
-    "github.com/aacebedo/cfdnsupdater/go/core"
-    "github.com/aacebedo/cfdnsupdater/go/utils"
+    "github.com/aacebedo/cfdnsupdater/src/core"
+    "github.com/aacebedo/cfdnsupdater/src/utils"
   )
 
 

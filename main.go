@@ -16,9 +16,9 @@
 package main
 
 import (
-	"github.com/aacebedo/cfdnsupdater/go/utils"
-	"github.com/aacebedo/cfdnsupdater/go/configuration"
-	"github.com/aacebedo/cfdnsupdater/go/updater"
+	"github.com/aacebedo/cfdnsupdater/src/utils"
+	"github.com/aacebedo/cfdnsupdater/src/configuration"
+	"github.com/aacebedo/cfdnsupdater/src/updater"
 	"os"
 	"sync"
 	"github.com/op/go-logging"
