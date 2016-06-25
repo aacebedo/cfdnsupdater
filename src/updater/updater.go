@@ -26,7 +26,10 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("cfdnsupdater.updater")
 
 type DomainUpdater struct {
 	domain      string
@@ -133,9 +136,10 @@ SLEEP_PERIOD:
 						zoneDetail.Name, recordDetail.Type, recordDetail.Name)
 					recordIp := net.ParseIP(recordDetail.Content)
 					recordType, convertErr := core.FromString(recordDetail.Type)
+							
 					if !reflect.DeepEqual(recordIp, publicIP) && convertErr == nil &&
-						(len(self.recordTypes) == 0 || (self.recordTypes.Contains(recordType))) &&
-						(len(self.recordNames) == 0 || !utils.StringInSlice(recordDetail.Name,
+						(len(self.recordTypes) == 0 || self.recordTypes.Contains(recordType)) &&
+						(len(self.recordNames) == 0 || utils.StringInSlice(recordDetail.Name,
 							self.recordNames)) {
 						logger.Debugf("%s: Record %s:'%s' needs to be updated",
 							self.domain, recordDetail.Type, recordDetail.Name)
